@@ -104,8 +104,8 @@ func (sfver SFVer) Create(files <-chan string, cancel <-chan bool) (*FileOut, er
 	output := make(chan Entry, sfver.parallelism)
 	var wg sync.WaitGroup
 	for i := 0; i < sfver.parallelism; i++ {
-		wg.Add(1)
 		go func() {
+			wg.Add(1)
 			defer wg.Done()
 			for {
 				select {
@@ -122,6 +122,8 @@ func (sfver SFVer) Create(files <-chan string, cancel <-chan bool) (*FileOut, er
 
 	var result FileOut
 	go func() {
+		wg.Add(1)
+		defer wg.Done()
 		entries := make([]Entry, 10)
 		for {
 			entry, ok := <-output
@@ -130,6 +132,7 @@ func (sfver SFVer) Create(files <-chan string, cancel <-chan bool) (*FileOut, er
 			}
 			entries = append(entries, entry)
 		}
+		result.Entries = entries
 	}()
 
 	go func() {
