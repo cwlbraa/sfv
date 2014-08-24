@@ -131,7 +131,7 @@ func (sfver SFVer) Verify(fullName string, cancel <-chan interface{}) (*Verifica
 	var mutex sync.Mutex
 	hashMap := make(map[string]Entry)
 	files := make(chan string, sfver.parallelism)
-	processed := make(chan *EntryStatus, 64)
+	processed := make(chan *EntryStatus, len(file.Entries))
 	go func() {
 		for _, e := range file.Entries {
 			mutex.Lock()
