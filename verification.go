@@ -76,7 +76,7 @@ func (e SyntaxError) Error() string {
 	return fmt.Sprintf(e.template, e.Line, e.inner)
 }
 
-// Craete hash incoming files and return a publishing channel.
+// Create hash incoming files and return a publishing channel.
 func (sfver SFVer) Create(files <-chan string, cancel <-chan interface{}) (*FileOut, error) {
 	output := make(chan Entry, 256)
 
