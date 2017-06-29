@@ -38,8 +38,9 @@ type SyntaxError struct {
 }
 
 type EntryStatus struct {
-	Entry  *Entry
-	Status int
+	Entry    *Entry
+	Expected *Entry
+	Status   int
 }
 
 type Verification struct {
@@ -88,12 +89,11 @@ func (sfver SFVer) Create(files <-chan string, cancel <-chan interface{}) (*File
 
 	for i := 0; i < sfver.parallelism; i++ {
 		go func() {
-			defer func() {
-				wg.Done()
-			}()
+			defer wg.Done()
 			for {
 				select {
 				case fullName, ok := <-files:
+					fmt.Printf("fullname %#v ok %#v\n", fullName, ok)
 					if !ok {
 						return
 					}
@@ -136,6 +136,7 @@ func (sfver SFVer) Verify(fullName string, cancel <-chan interface{}) (*Verifica
 		for _, e := range file.Entries {
 			mutex.Lock()
 			hashMap[e.Name] = e
+			fmt.Printf("got %#v out of supplied file\n", e)
 			mutex.Unlock()
 			_, err := os.Lstat(e.FullName())
 			if err != nil {
@@ -147,13 +148,14 @@ func (sfver SFVer) Verify(fullName string, cancel <-chan interface{}) (*Verifica
 					entryStatus.Status = Error
 				}
 				processed <- &entryStatus
-			} else {
-				files <- e.FullName()
+				continue
 			}
+			files <- e.FullName()
 		}
 		close(files)
 	}()
 
+	// generate a file that we're not gonna write out
 	out, err := sfver.Create(files, cancel)
 	if err != nil {
 		return nil, err
@@ -162,6 +164,7 @@ func (sfver SFVer) Verify(fullName string, cancel <-chan interface{}) (*Verifica
 	var result Verification
 	result.Entries = file.Entries
 	result.Processed = processed
+	fmt.Printf("gonna check the hashsums against the generated file\n")
 
 	go func() {
 		for {
@@ -172,10 +175,12 @@ func (sfver SFVer) Verify(fullName string, cancel <-chan interface{}) (*Verifica
 			}
 			mutex.Lock()
 			compare := hashMap[entry.Name]
+			fmt.Printf("hashmap entry %#v for %#v\n", compare, entry)
 			mutex.Unlock()
 
 			var entryStatus EntryStatus
 			entryStatus.Entry = &entry
+			entryStatus.Expected = &compare
 
 			if compare.Value == entry.Value {
 				entryStatus.Status = Good
@@ -209,7 +214,7 @@ func Calculate(fullName string, cancel <-chan interface{}) (uint32, error) {
 	defer f.Close()
 
 	buffer := make([]byte, 8192)
-	hasher := crc32.NewIEEE()
+	hasher := crc32.New(crc32.MakeTable(crc32.Castagnoli))
 ForLoop:
 	for {
 		select {
